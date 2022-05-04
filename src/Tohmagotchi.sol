@@ -8,10 +8,27 @@
 pragma solidity ^0.8.0;
 
 contract Tohmagotchi {
+    /*///////////////////////////////////////////////////////////////
+                                ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error Tohmagotchi_NotOwner();
+    error Tohmagotchi_Dead();
+    error Tohmagotchi_Bored();
+    error Tohmagotchi_Unclean();
+    error Tohmagotchi_Hungry();
+    error Tohmagotchi_Sleepy();
+    error Tohmagotchi_Full();
+    error Tohmagotchi_Clean();
+    error Tohmagotchi_Content();
+    error Tohmagotchi_Awake();
+
+    /*///////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     address _owner;
     bool _birthed;
-
-    event CaretakerLoved(address indexed caretaker, uint256 indexed amount);
 
     uint256 lastFeedBlock;
     uint256 lastCleanBlock;
@@ -25,10 +42,11 @@ contract Tohmagotchi {
 
     mapping(address => uint256) public love;
 
-    modifier onlyOwner() {
-        require(msg.sender == _owner);
-        _;
-    }
+    /*///////////////////////////////////////////////////////////////
+                                EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    event CaretakerLoved(address indexed caretaker, uint256 indexed amount);
 
     constructor() {
         _owner = msg.sender;
@@ -43,16 +61,23 @@ contract Tohmagotchi {
         sleepiness = 0;
     }
 
-    function addLove(address caretaker, uint256 amount) internal {
-        love[caretaker] += amount;
-        emit CaretakerLoved(caretaker, amount);
+    /*///////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    function onlyOwner() internal view returns (bool) {
+        return msg.sender == _owner;
     }
 
+    /*///////////////////////////////////////////////////////////////
+                                CARETAKING
+    //////////////////////////////////////////////////////////////*/
+
     function feed() public {
-        require(getAlive(), "no longer with us");
-        require(getBoredom() < 80, "im too tired to eat");
-        require(getUncleanliness() < 80, "im feeling too gross to eat");
-        // require(getHunger() > 0, "i dont need to eat");
+        if (!getAlive()) revert Tohmagotchi_Dead();
+        if (getBoredom() >= 80) revert Tohmagotchi_Bored();
+        if (getUncleanliness() >= 80) revert Tohmagotchi_Unclean();
+        if (getHunger() == 0) revert Tohmagotchi_Full();
 
         lastFeedBlock = block.number;
 
@@ -64,8 +89,9 @@ contract Tohmagotchi {
     }
 
     function clean() public {
-        require(getAlive(), "no longer with us");
-        require(getUncleanliness() > 0, "i dont need a bath");
+        if (!getAlive()) revert Tohmagotchi_Dead();
+        if (getUncleanliness() == 0) revert Tohmagotchi_Clean();
+
         lastCleanBlock = block.number;
 
         uncleanliness = 0;
@@ -74,11 +100,11 @@ contract Tohmagotchi {
     }
 
     function play() public {
-        require(getAlive(), "no longer with us");
-        require(getHunger() < 80, "im too hungry to play");
-        require(getSleepiness() < 80, "im too sleepy to play");
-        require(getUncleanliness() < 80, "im feeling too gross to play");
-        // require(getBoredom() > 0, "i dont wanna play");
+        if (!getAlive()) revert Tohmagotchi_Dead();
+        if (getHunger() >= 80) revert Tohmagotchi_Hungry();
+        if (getSleepiness() >= 80) revert Tohmagotchi_Sleepy();
+        if (getUncleanliness() >= 80) revert Tohmagotchi_Unclean();
+        if (getBoredom() == 0) revert Tohmagotchi_Content();
 
         lastPlayBlock = block.number;
 
@@ -91,9 +117,9 @@ contract Tohmagotchi {
     }
 
     function sleep() public {
-        require(getAlive(), "no longer with us");
-        require(getUncleanliness() < 80, "im feeling too gross to sleep");
-        require(getSleepiness() > 0, "im not feeling sleepy");
+        if (!getAlive()) revert Tohmagotchi_Dead();
+        if (getUncleanliness() >= 80) revert Tohmagotchi_Unclean();
+        if (getSleepiness() == 0) revert Tohmagotchi_Awake();
 
         lastSleepBlock = block.number;
 
@@ -102,6 +128,19 @@ contract Tohmagotchi {
 
         addLove(msg.sender, 1);
     }
+
+    /*///////////////////////////////////////////////////////////////
+                            INTERNAL HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function addLove(address caretaker, uint256 amount) internal {
+        love[caretaker] += amount;
+        emit CaretakerLoved(caretaker, amount);
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                                VIEWS
+    //////////////////////////////////////////////////////////////*/
 
     function getStatus() public view returns (string memory) {
         uint256 mostNeeded = 0;
